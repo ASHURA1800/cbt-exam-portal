@@ -22,6 +22,44 @@ BANK_DB_PATH = "question_bank.db"
 _bank_lock = threading.Lock()
 _bank_local = threading.local()
 
+# ── Auto-setup DB on first run ────────────────────────────────────────────────
+def _setup_db_if_needed():
+    """
+    Tries 2 methods to get question_bank.db:
+    1. Reassemble from .part_* files (if present)
+    2. Download from GitHub Releases URL (set DB_DOWNLOAD_URL env var)
+    """
+    import os, glob
+
+    if os.path.exists(BANK_DB_PATH) and os.path.getsize(BANK_DB_PATH) > 1_000_000:
+        return  # Already exists
+
+    # Method 1: Reassemble from split parts
+    parts = sorted(glob.glob(BANK_DB_PATH + ".part_*"))
+    if parts:
+        print(f"🔧 Reassembling question_bank.db from {len(parts)} parts...", flush=True)
+        with open(BANK_DB_PATH, "wb") as out:
+            for part in parts:
+                with open(part, "rb") as f:
+                    out.write(f.read())
+        size_mb = os.path.getsize(BANK_DB_PATH) / 1_048_576
+        print(f"✅ question_bank.db assembled ({size_mb:.1f} MB)", flush=True)
+        return
+
+    # Method 2: Download from GitHub Releases
+    url = os.environ.get("DB_DOWNLOAD_URL", "")
+    if url:
+        import urllib.request
+        print(f"📥 Downloading question_bank.db...", flush=True)
+        try:
+            urllib.request.urlretrieve(url, BANK_DB_PATH)
+            size_mb = os.path.getsize(BANK_DB_PATH) / 1_048_576
+            print(f"✅ Downloaded ({size_mb:.1f} MB)", flush=True)
+        except Exception as e:
+            print(f"❌ Download failed: {e}", flush=True)
+
+_setup_db_if_needed()
+
 SUPPORTED_LANGUAGES = ["en", "hi", "mr", "ta", "te", "gu", "bn", "kn", "or"]
 
 SUBJECT_EXAM_MAP = {
